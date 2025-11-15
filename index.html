@@ -497,6 +497,7 @@
                 if (data.updateLock) {
                     console.warn('[Questions] 题库正在维护中');
                     showToast('题库正在更新，请稍后再试', 5000);
+                    loadBackupQuestions();
                     return false;
                 }
                 
@@ -681,14 +682,12 @@
             const selected = shuffled.slice(0, count);
             
             // 验证唯一性
-            const usedQuestions = new Set();
-            selected.forEach((q, i) => {
-                const key = `${q.dimension}-${q.question.substring(0, 20)}`;
-                if (usedQuestions.has(key)) {
-                    console.error('[Questions] 警告：检测到可能的重复题目', key);
-                }
-                usedQuestions.add(key);
-            });
+            const ids = selectedQuestions.map((q, i) => `${q.dimension}-${i}`);
+            const unique = new Set(ids);
+            if (unique.size !== selectedQuestions.length) {
+                console.error('[Questions] 检测到重复题目！');
+                trackEvent('question_duplicate_error');
+            }
             
             return selected;
         }
@@ -807,15 +806,23 @@
             
             // 恢复已选答案
             if (answers[currentQuestion] !== undefined) {
-                const savedAnswer = answers[currentQuestion];
-                const optionIndex = question.options.findIndex(opt => opt.value === savedAnswer);
-                if (optionIndex !== -1) {
-                    selectOption(optionIndex, savedAnswer);
+                const saved = answers[currentQuestion];
+                // ✅ 修复：优先使用保存的索引，确保恢复正确选项
+                if (saved && typeof saved === 'object' && saved.index !== undefined) {
+                    selectOption(saved.index, saved.value);
+                } else {
+                    // 兼容旧数据格式
+                    const optionIndex = question.options.findIndex(opt => 
+                        opt.value === saved || (typeof saved === 'object' && opt.value === saved.value)
+                    );
+                    if (optionIndex !== -1) {
+                        selectOption(optionIndex, question.options[optionIndex].value);
+                    }
                 }
             }
         }
 
-        // 选择选项
+        // 选择选项（修复后）
         function selectOption(index, value) {
             // 清除之前选择
             document.querySelectorAll('.option').forEach(opt => opt.classList.remove('selected'));
@@ -826,13 +833,15 @@
             selectedElement.classList.add('selected');
             selectedElement.querySelector('input[type="radio"]').checked = true;
             
-            // 存储答案（按题目索引）
-            answers[currentQuestion] = value;
+            // ✅ 修复：同时存储 value 和 index，确保能精确恢复用户选择的选项
+            answers[currentQuestion] = { 
+                value, 
+                index,
+                timestamp: Date.now()
+            };
             
             // 启用下一题
             document.getElementById('nextBtn').disabled = false;
-            
-            // 自动保存
             saveProgress();
         }
 
@@ -861,7 +870,7 @@
             const dimensionScores = { E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 };
             
             // 统计每个维度的答案
-            Object.entries(answers).forEach(([questionIndex, answerValue]) => {
+            Object.entries(answers).forEach(([questionIndex, answerData]) => {
                 const question = selectedQuestions[parseInt(questionIndex)];
                 if (!question) {
                     console.warn('[Result] 题目索引无效:', questionIndex);
@@ -869,19 +878,22 @@
                 }
                 
                 const { dimension } = question;
-                if (!['E', 'I', 'S', 'N', 'T', 'F', 'J', 'P'].includes(answerValue)) {
-                    console.warn('[Result] 无效的答案值:', answerValue);
+                // ✅ 修复：兼容新对象格式和旧字符串格式
+                const value = typeof answerData === 'object' ? answerData.value : answerData;
+                
+                if (!['E', 'I', 'S', 'N', 'T', 'F', 'J', 'P'].includes(value)) {
+                    console.warn('[Result] 无效的答案值:', value);
                     return;
                 }
                 
-                if (dimension === 'EI' && ['E', 'I'].includes(answerValue)) {
-                    dimensionScores[answerValue]++;
-                } else if (dimension === 'SN' && ['S', 'N'].includes(answerValue)) {
-                    dimensionScores[answerValue]++;
-                } else if (dimension === 'TF' && ['T', 'F'].includes(answerValue)) {
-                    dimensionScores[answerValue]++;
-                } else if (dimension === 'JP' && ['J', 'P'].includes(answerValue)) {
-                    dimensionScores[answerValue]++;
+                if (dimension === 'EI' && ['E', 'I'].includes(value)) {
+                    dimensionScores[value]++;
+                } else if (dimension === 'SN' && ['S', 'N'].includes(value)) {
+                    dimensionScores[value]++;
+                } else if (dimension === 'TF' && ['T', 'F'].includes(value)) {
+                    dimensionScores[value]++;
+                } else if (dimension === 'JP' && ['J', 'P'].includes(value)) {
+                    dimensionScores[value]++;
                 }
             });
             
