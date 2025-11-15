@@ -13,12 +13,13 @@
     <meta name="twitter:card" content="summary_large_image">
     
     <style>
+        /* ============ 你原来的所有样式保持不变 ============ */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent; /* 移除移动端点击高亮 */
-            user-select: none; /* 防止误选文字 */
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
         }
 
         body {
@@ -27,7 +28,7 @@
             min-height: 100vh;
             color: #2d3a2d;
             line-height: 1.6;
-            -webkit-font-smoothing: antialiased; /* 字体抗锯齿 */
+            -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
 
@@ -172,7 +173,7 @@
 
         .option input[type="radio"] {
             margin-right: 15px;
-            pointer-events: none; /* 防止点击radio时事件冒泡问题 */
+            pointer-events: none;
         }
 
         /* 移动端触摸反馈 */
@@ -228,11 +229,8 @@
             margin-bottom: 20px;
             display: inline-block;
             line-height: 1;
-            /* 兜底方案：不支持filter的浏览器 */
             text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            /* 现代浏览器 */
             filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
-            /* 动画效果 */
             animation: float 3s ease-in-out infinite;
         }
 
@@ -386,6 +384,26 @@
         .toast.show {
             opacity: 1;
         }
+
+        /* 版本号显示 - 新增样式 */
+        .version-footer {
+            text-align: center;
+            padding: 20px;
+            margin-top: 40px;
+            font-size: 0.85em;
+            color: #7a8d81;
+            border-top: 1px solid rgba(122, 141, 129, 0.2);
+        }
+
+        .version-footer a {
+            color: #1b5e20;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .version-footer a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -442,6 +460,13 @@
                 </div>
             </div>
         </div>
+
+        <!-- 版本号显示 - 新增 -->
+        <div class="version-footer" id="versionFooter">
+            <p>版本号：<span id="versionNumber">加载中...</span> | 
+            题库数量：<span id="questionCount">-</span>题 | 
+            <a onclick="reloadQuestions()">热更新题库</a></p>
+        </div>
     </div>
 
     <!-- 提示消息 -->
@@ -449,265 +474,97 @@
 
     <script>
         // ==================== 配置参数 ====================
-        const QUESTIONS_PER_TEST = 50; // 可自由调整：20/50/100
+        const QUESTIONS_PER_TEST = 50;
         const STORAGE_KEY = 'plantTest_progress_v1';
         // =================================================
 
-        // ==================== 完整题库（100道题） ====================
-        const allQuestions = [
-            // 基础维度题 (EI)
-            { dimension: 'EI', question: "在社交聚会中，你通常如何表现？", options: [{ text: "主动与多人交谈，享受成为焦点", value: 'E' }, { text: "与少数几个人深入交流", value: 'E' }, { text: "观察他人，偶尔参与对话", value: 'I' }, { text: "找安静的角落，期待早点离开", value: 'I' }] },
-            { dimension: 'EI', question: "独处一天后，你的感觉是？", options: [{ text: "渴望社交，感到孤独", value: 'E' }, { text: "稍微想念朋友，但能享受", value: 'E' }, { text: "感到充实和精力充沛", value: 'I' }, { text: "非常享受，希望时间更长", value: 'I' }] },
-            { dimension: 'EI', question: "在团队合作中，你通常扮演什么角色？", options: [{ text: "主导讨论，协调各方", value: 'E' }, { text: "积极发言，推动进展", value: 'E' }, { text: "倾听思考，适时提出建议", value: 'I' }, { text: "独立完成任务，较少参与讨论", value: 'I' }] },
-            { dimension: 'EI', question: "你的情感表达方式通常是？", options: [{ text: "外向直接，乐于分享感受", value: 'E' }, { text: "主动沟通，寻求共鸣", value: 'E' }, { text: "内敛含蓄，选择性表达", value: 'I' }, { text: "深藏心底，独自消化", value: 'I' }] },
-            { dimension: 'EI', question: "在陌生环境中，你的社交策略是？", options: [{ text: "主动介绍自己，建立联系", value: 'E' }, { text: "观察后主动接近感兴趣的人", value: 'E' }, { text: "等待他人接近，谨慎回应", value: 'I' }, { text: "保持距离，专注于自己的事情", value: 'I' }] },
-            
-            // 爱情主题题 (EI维度)
-            { dimension: 'EI', question: "在爱情中，你更倾向于？", options: [{ text: "热烈表达，经常说我爱你", value: 'E' }, { text: "主动分享心情和想法", value: 'E' }, { text: "默默守护，用行动表达", value: 'I' }, { text: "独处沉淀，偶尔表达", value: 'I' }] },
-            { dimension: 'EI', question: "与恋人争吵后，你会？", options: [{ text: "立即沟通，希望马上解决", value: 'E' }, { text: "主动和解，让关系回暖", value: 'E' }, { text: "冷静思考，需要时间平复", value: 'I' }, { text: "独处消化，等待合适时机", value: 'I' }] },
-            { dimension: 'EI', question: "理想约会方式是？", options: [{ text: "热闹派对，享受氛围", value: 'E' }, { text: "朋友聚会，轻松愉快", value: 'E' }, { text: "二人世界，安静交流", value: 'I' }, { text: "独处共读，各自看书", value: 'I' }] },
-            
-            // 基础维度题 (SN)
-            { dimension: 'SN', question: "当你听到朋友分享情感困扰时，你的第一反应是？", options: [{ text: "先共情安慰，再提供具体建议", value: 'S' }, { text: "询问细节，了解事情全貌", value: 'S' }, { text: "思考深层原因和潜在模式", value: 'N' }, { text: "探讨可能性和未来发展方向", value: 'N' }] },
-            { dimension: 'SN', question: "描述一次旅行经历时，你会强调？", options: [{ text: "具体行程、美食和风景细节", value: 'S' }, { text: "实际花费和实用建议", value: 'S' }, { text: "文化感悟和心灵收获", value: 'N' }, { text: "旅行意义和人生启发", value: 'N' }] },
-            { dimension: 'SN', question: "面对失败，你的反思重点是？", options: [{ text: "具体哪里出错，如何改进", value: 'S' }, { text: "总结经验，建立检查清单", value: 'S' }, { text: "思考背后的模式和原因", value: 'N' }, { text: "寻找新的方向和可能性", value: 'N' }] },
-            { dimension: 'SN', question: "学习新知识时，你更喜欢哪种方式？", options: [{ text: "循序渐进，从基础开始", value: 'S' }, { text: "结合实际案例和动手实践", value: 'S' }, { text: "先理解整体框架和理论", value: 'N' }, { text: "探索不同概念间的联系", value: 'N' }] },
-            { dimension: 'SN', question: "你对朋友的承诺通常？", options: [{ text: "说到做到，重视实际行动", value: 'S' }, { text: "尽力兑现，考虑现实条件", value: 'S' }, { text: "理解精神内涵，灵活处理", value: 'N' }, { text: "看重意图，不拘泥形式", value: 'N' }] },
-            
-            // 爱情主题题 (SN维度)
-            { dimension: 'SN', question: "在爱情中，细节对你而言？", options: [{ text: "记得每一次约会和细节", value: 'S' }, { text: "比较在意，记得重要日子", value: 'S' }, { text: "更看重整体感觉和氛围", value: 'N' }, { text: "在意精神连接和心灵契合", value: 'N' }] },
-            { dimension: 'SN', question: "回忆恋情时，你更记得？", options: [{ text: "第一次约会的具体场景", value: 'S' }, { text: "具体的承诺和约定", value: 'S' }, { text: "当时的情感和心情", value: 'N' }, { text: "关系带来的成长和变化", value: 'N' }] },
-            { dimension: 'SN', question: "理想伴侣的特质是？", options: [{ text: "踏实可靠，行动证明爱", value: 'S' }, { text: "稳定温暖，细节关怀到位", value: 'S' }, { text: "有深度，能精神交流", value: 'N' }, { text: "有共同理想，一起探索", value: 'N' }] },
-            
-            // 基础维度题 (TF)
-            { dimension: 'TF', question: "做决定时，什么对你更重要？", options: [{ text: "逻辑分析和客观事实", value: 'T' }, { text: "公平原则和效率最大化", value: 'T' }, { text: "个人价值观和他人感受", value: 'F' }, { text: "和谐氛围和情感影响", value: 'F' }] },
-            { dimension: 'TF', question: "在冲突中，你更重视？", options: [{ text: "事实真相和逻辑正确", value: 'T' }, { text: "解决方案的合理性", value: 'T' }, { text: "关系修复和相互理解", value: 'F' }, { text: "每个人的感受被照顾", value: 'F' }] },
-            { dimension: 'TF', question: "当朋友做了你不同意的事，你会？", options: [{ text: "直接指出问题，分析利弊", value: 'T' }, { text: "提出改进建议，保持客观", value: 'T' }, { text: "考虑动机，委婉表达关心", value: 'F' }, { text: "先表示理解，再分享感受", value: 'F' }] },
-            { dimension: 'TF', question: "评价一部电影时，你最看重？", options: [{ text: "剧情逻辑和制作技术", value: 'T' }, { text: "故事结构和导演手法", value: 'T' }, { text: "情感共鸣和人物关系", value: 'F' }, { text: "价值观传达和内在意义", value: 'F' }] },
-            { dimension: 'TF', question: "帮助他人时，你的出发点是？", options: [{ text: "这是正确且高效的做法", value: 'T' }, { text: "基于公平和理性判断", value: 'T' }, { text: "感同身受，不忍看到痛苦", value: 'F' }, { text: "希望传递温暖和善意", value: 'F' }] },
-            
-            // 爱情主题题 (TF维度)
-            { dimension: 'TF', question: "当你深爱一个人，你会如何表达？", options: [{ text: "理性规划未来，给出承诺", value: 'T' }, { text: "分析如何让关系更好", value: 'T' }, { text: "自然流露，温柔体贴", value: 'F' }, { text: "用心感受，温暖陪伴", value: 'F' }] },
-            { dimension: 'TF', question: "恋人的缺点让你困扰时，你会？", options: [{ text: "理性沟通，寻求解决方案", value: 'T' }, { text: "客观分析，提出改进建议", value: 'T' }, { text: "包容接纳，用爱化解", value: 'F' }, { text: "理解并温暖地陪伴成长", value: 'F' }] },
-            { dimension: 'TF', question: "爱情中最重要的是？", options: [{ text: "承诺与责任", value: 'T' }, { text: "理性与效率", value: 'T' }, { text: "理解与共鸣", value: 'F' }, { text: "温暖与默契", value: 'F' }] },
-            { dimension: 'TF', question: "当恋人情绪低落时，你会？", options: [{ text: "分析问题根源，给出建议", value: 'T' }, { text: "提供实际解决方案", value: 'T' }, { text: "静静陪伴，给予安慰", value: 'F' }, { text: "温柔抚慰，传递温暖", value: 'F' }] },
-            
-            // 基础维度题 (JP)
-            { dimension: 'JP', question: "你的工作和生活习惯更倾向于？", options: [{ text: "制定详细计划并严格执行", value: 'J' }, { text: "有大致框架，按计划进行", value: 'J' }, { text: "保持灵活性，随时调整", value: 'P' }, { text: "随性而为，享受未知惊喜", value: 'P' }] },
-            { dimension: 'JP', question: "面对临时变化，你的反应是？", options: [{ text: "感到压力，希望按原计划", value: 'J' }, { text: "需要时间重新规划", value: 'J' }, { text: "视变化为新机会", value: 'P' }, { text: "兴奋期待，立即适应", value: 'P' }] },
-            { dimension: 'JP', question: "你的房间或办公桌通常是？", options: [{ text: "整洁有序，每件物品有固定位置", value: 'J' }, { text: "分类明确，偶尔小乱", value: 'J' }, { text: "创意性混乱，知道东西在哪", value: 'P' }, { text: "随性摆放，享受自由感", value: 'P' }] },
-            { dimension: 'JP', question: "周末安排，你更喜欢？", options: [{ text: "提前计划好各项活动", value: 'J' }, { text: "有几项预定安排", value: 'J' }, { text: "根据心情临时决定", value: 'P' }, { text: "完全随性，不做计划", value: 'P' }] },
-            { dimension: 'JP', question: "你的理想生活方式是？", options: [{ text: "稳定有序，目标明确", value: 'J' }, { text: "规律充实，计划周详", value: 'J' }, { text: "灵活多变，保持开放", value: 'P' }, { text: "自由探索，拥抱未知", value: 'P' }] },
-            
-            // 爱情主题题 (JP维度)
-            { dimension: 'JP', question: "对爱情的长远规划，你倾向于？", options: [{ text: "清晰规划每一步", value: 'J' }, { text: "有计划地推进", value: 'J' }, { text: "随心而动，顺其自然", value: 'P' }, { text: "享受当下的美好", value: 'P' }] },
-            { dimension: 'JP', question: "恋爱中的约会安排，你更喜欢？", options: [{ text: "精心策划每个细节", value: 'J' }, { text: "有大致计划", value: 'J' }, { text: "自由发挥，即兴决定", value: 'P' }, { text: "随缘，走到哪算哪", value: 'P' }] },
-            { dimension: 'JP', question: "面对恋人的临时提议，你会？", options: [{ text: "需要时间调整安排", value: 'J' }, { text: "确认计划后接受", value: 'J' }, { text: "欣然接受，觉得有趣", value: 'P' }, { text: "开心跟随，享受惊喜", value: 'P' }] },
-            
-            // 恋爱关系题
-            { dimension: 'EI', question: "失恋后，你疗伤的方式是？", options: [{ text: "找朋友倾诉，需要陪伴", value: 'E' }, { text: "与人交流，释放情绪", value: 'E' }, { text: "独处思考，慢慢平复", value: 'I' }, { text: "独自消化，需要时间", value: 'I' }] },
-            { dimension: 'SN', question: "初恋的回忆对你来说？", options: [{ text: "记得具体场景和细节", value: 'S' }, { text: "记得说过的话和承诺", value: 'S' }, { text: "记得当时的情感和心情", value: 'N' }, { text: "记得成长的意义", value: 'N' }] },
-            { dimension: 'TF', question: "爱情与面包的选择，你更看重？", options: [{ text: "理性分析，权衡利弊", value: 'T' }, { text: "客观判断，选择最优", value: 'T' }, { text: "跟随内心感受", value: 'F' }, { text: "听从情感指引", value: 'F' }] },
-            { dimension: 'JP', question: "对爱情的承诺，你的态度是？", options: [{ text: "重视承诺，一旦做出不更改", value: 'J' }, { text: "认真对待，努力坚守", value: 'J' }, { text: "视情况而定，保持开放", value: 'P' }, { text: "顺其自然，不强求", value: 'P' }] },
-            
-            // 补充题目 - 日常生活
-            { dimension: 'EI', question: "理想周末社交是？", options: [{ text: "热闹派对，认识新朋友", value: 'E' }, { text: "朋友聚会，轻松聊天", value: 'E' }, { text: "安静在家，享受独处", value: 'I' }, { text: "独自活动，不被打扰", value: 'I' }] },
-            { dimension: 'SN', question: "选择礼物时，你更看重？", options: [{ text: "实用性和对方需求", value: 'S' }, { text: "实际用途和性价比", value: 'S' }, { text: "心意和情感传递", value: 'N' }, { text: "象征意义和纪念价值", value: 'N' }] },
-            { dimension: 'TF', question: "评价他人时，你倾向于？", options: [{ text: "客观公正，基于事实", value: 'T' }, { text: "理性分析，标准一致", value: 'T' }, { text: "理解包容，考虑处境", value: 'F' }, { text: "体察感受，温和评价", value: 'F' }] },
-            { dimension: 'JP', question: "工作截止前，你会？", options: [{ text: "提前完成，留有余地", value: 'J' }, { text: "按计划准时完成", value: 'J' }, { text: "最后冲刺，卡点完成", value: 'P' }, { text: "灵活调整，随性完成", value: 'P' }] },
-            
-            // 补充题目 - 人际关系
-            { dimension: 'EI', question: "维系友谊的方式是？", options: [{ text: "主动联系，定期聚会", value: 'E' }, { text: "积极沟通，保持热度", value: 'E' }, { text: "偶尔联系，心有灵犀", value: 'I' }, { text: "默默关注，不强求", value: 'I' }] },
-            { dimension: 'SN', question: "理解他人时，你更关注？", options: [{ text: "具体言行和事实", value: 'S' }, { text: "细节和具体表现", value: 'S' }, { text: "言外之意和感受", value: 'N' }, { text: "深层动机和想法", value: 'N' }] },
-            { dimension: 'TF', question: "朋友求助超出能力范围，你会？", options: [{ text: "理性拒绝，说明情况", value: 'T' }, { text: "客观分析，划清界限", value: 'T' }, { text: "尽力帮助，不忍拒绝", value: 'F' }, { text: "体谅难处，尽力而为", value: 'F' }] },
-            { dimension: 'JP', question: "计划旅行时，你的风格是？", options: [{ text: "详细规划，精确到小时", value: 'J' }, { text: "制定行程表，按计划走", value: 'J' }, { text: "大致方向，边走边看", value: 'P' }, { text: "随意逛逛，随缘而行", value: 'P' }] },
-            
-            // 补充题目 - 个人成长
-            { dimension: 'EI', question: "面对重大选择，你需要？", options: [{ text: "听取多方意见，交流想法", value: 'E' }, { text: "与人讨论，理清思路", value: 'E' }, { text: "独自思考，不受干扰", value: 'I' }, { text: "深度内省，安静决策", value: 'I' }] },
-            { dimension: 'SN', question: "你的灵感来源是？", options: [{ text: "生活经验和实际观察", value: 'S' }, { text: "现实案例和具体事物", value: 'S' }, { text: "内心想象和联想", value: 'N' }, { text: "抽象概念和可能性", value: 'N' }] },
-            { dimension: 'TF', question: "处理人际关系难题时，你更依赖？", options: [{ text: "逻辑分析和理性判断", value: 'T' }, { text: "客观标准和原则", value: 'T' }, { text: "感受他人，体谅情绪", value: 'F' }, { text: "换位思考，理解感受", value: 'F' }] },
-            { dimension: 'JP', question: "你的生活哲学是？", options: [{ text: "目标明确，按计划执行", value: 'J' }, { text: "有序管理，循序渐进", value: 'J' }, { text: "灵活应变，随遇而安", value: 'P' }, { text: "顺其自然，享受过程", value: 'P' }] },
-            
-            // 补充题目 - 情感世界
-            { dimension: 'TF', question: "被影视作品感动时，你的反应是？", options: [{ text: "分析剧情合理性", value: 'T' }, { text: "思考逻辑是否严密", value: 'T' }, { text: "自然流泪，情绪共鸣", value: 'F' }, { text: "感受深刻，心情波动", value: 'F' }] },
-            { dimension: 'SN', question: "回忆往事，你的方式是？", options: [{ text: "想起具体事件", value: 'S' }, { text: "记得细节和对话", value: 'S' }, { text: "浮现整体感受", value: 'N' }, { text: "体会当时意境", value: 'N' }] },
-            { dimension: 'EI', question: "独处时，你通常？", options: [{ text: "感到无聊，想联系朋友", value: 'E' }, { text: "想找点社交活动", value: 'E' }, { text: "享受自己的时间", value: 'I' }, { text: "沉浸在自己的世界", value: 'I' }] },
-            { dimension: 'JP', question: "生活安排，你更喜欢？", options: [{ text: "有条不紊进行", value: 'J' }, { text: "按计划表执行", value: 'J' }, { text: "随意灵活处理", value: 'P' }, { text: "自由自在生活", value: 'P' }] },
-            
-            // 补充题目 - 工作方式
-            { dimension: 'EI', question: "头脑风暴时，你倾向于？", options: [{ text: "快速说出想法，边想边说", value: 'E' }, { text: "积极参与，即时回应", value: 'E' }, { text: "先思考再发言", value: 'I' }, { text: "深思熟虑后表达", value: 'I' }] },
-            { dimension: 'SN', question: "完成任务时，你更注重？", options: [{ text: "细节准确，步骤完整", value: 'S' }, { text: "具体执行，实际操作", value: 'S' }, { text: "整体效果和目标", value: 'N' }, { text: "创新思路和可能性", value: 'N' }] },
-            { dimension: 'TF', question: "领导团队时，你的风格是？", options: [{ text: "严明公正，按规则办事", value: 'T' }, { text: "客观理性，标准一致", value: 'T' }, { text: "关怀体贴，关注感受", value: 'F' }, { text: "理解支持，鼓励为主", value: 'F' }] },
-            { dimension: 'JP', question: "项目截止前，你会？", options: [{ text: "提前完成，留足时间", value: 'J' }, { text: "按计划准时交付", value: 'J' }, { text: "最后冲刺，卡点完成", value: 'P' }, { text: "灵活调整，随性完成", value: 'P' }] },
-            
-            // 补充题目 - 沟通方式
-            { dimension: 'EI', question: "表达观点时，你更喜欢？", options: [{ text: "公开演讲，面对众人", value: 'E' }, { text: "即时互动，快速交流", value: 'E' }, { text: "书面表达，深思熟虑", value: 'I' }, { text: "小范围深入讨论", value: 'I' }] },
-            { dimension: 'SN', question: "倾听朋友时，你更关注？", options: [{ text: "具体事实和细节", value: 'S' }, { text: "实际发生的过程", value: 'S' }, { text: "言外之意和感受", value: 'N' }, { text: "潜在原因和模式", value: 'N' }] },
-            { dimension: 'TF', question: "给予反馈时，你倾向于？", options: [{ text: "直接指出，客观真实", value: 'T' }, { text: "理性分析，标准一致", value: 'T' }, { text: "温和鼓励，考虑感受", value: 'F' }, { text: "体谅理解，委婉表达", value: 'F' }] },
-            { dimension: 'JP', question: "制定计划时，你的习惯是？", options: [{ text: "详细规划，精确执行", value: 'J' }, { text: "制定步骤，有序进行", value: 'J' }, { text: "大致方向，灵活调整", value: 'P' }, { text: "随感而发，即兴发挥", value: 'P' }] },
-            
-            // 补充题目 - 压力应对
-            { dimension: 'EI', question: "压力大时，你需要？", options: [{ text: "找人倾诉，释放压力", value: 'E' }, { text: "与人交流，寻求建议", value: 'E' }, { text: "独处静思，自我调整", value: 'I' }, { text: "独自活动，转移注意力", value: 'I' }] },
-            { dimension: 'SN', question: "解决问题时，你更相信？", options: [{ text: "过往经验和已知方法", value: 'S' }, { text: "实际验证过的方案", value: 'S' }, { text: "直觉和灵感", value: 'N' }, { text: "新思路和可能性", value: 'N' }] },
-            { dimension: 'TF', question: "道德困境中，你更倾向？", options: [{ text: "按原则和逻辑判断", value: 'T' }, { text: "基于理性分析决定", value: 'T' }, { text: "听从内心感受", value: 'F' }, { text: "考虑对他人影响", value: 'F' }] },
-            { dimension: 'JP', question: "生活变动时，你的适应方式是？", options: [{ text: "重新制定计划", value: 'J' }, { text: "调整安排适应", value: 'J' }, { text: "灵活应对变化", value: 'P' }, { text: "顺其自然接受", value: 'P' }] },
-            
-            // 补充题目 - 创造力
-            { dimension: 'SN', question: "你的想象力像？", options: [{ text: "基于现实的延伸", value: 'S' }, { text: "具体经验的组合", value: 'S' }, { text: "天马行空的构想", value: 'N' }, { text: "无拘无束的联想", value: 'N' }] },
-            { dimension: 'EI', question: "创作时，你更需要？", options: [{ text: "外界刺激和交流", value: 'E' }, { text: "互动讨论启发", value: 'E' }, { text: "独处安静思考", value: 'I' }, { text: "独立空间酝酿", value: 'I' }] },
-            { dimension: 'TF', question: "艺术创作对你而言是？", options: [{ text: "技术和技巧的运用", value: 'T' }, { text: "方法和规则的掌握", value: 'T' }, { text: "情感和感受的表达", value: 'F' }, { text: "内心世界的展现", value: 'F' }] },
-            { dimension: 'JP', question: "创作过程，你更喜欢？", options: [{ text: "按计划步骤推进", value: 'J' }, { text: "有框架地执行", value: 'J' }, { text: "自由发挥灵感", value: 'P' }, { text: "随性创意流动", value: 'P' }] },
-            
-            // 补充题目 - 价值观
-            { dimension: 'TF', question: "人生中最重要的是？", options: [{ text: "实现目标和成就", value: 'T' }, { text: "获得理性认可", value: 'T' }, { text: "感受爱与被爱", value: 'F' }, { text: "体验丰富情感", value: 'F' }] },
-            { dimension: 'SN', question: "你对未来的态度是？", options: [{ text: "关注现实和当下", value: 'S' }, { text: "重视实际和可行", value: 'S' }, { text: "憧憬可能和变化", value: 'N' }, { text: "追求理想和意义", value: 'N' }] },
-            { dimension: 'EI', question: "能量恢复的最佳方式是？", options: [{ text: "社交活动充电", value: 'E' }, { text: "与人互动恢复", value: 'E' }, { text: "独处静修恢复", value: 'I' }, { text: "安静环境充电", value: 'I' }] },
-            { dimension: 'JP', question: "时间管理上，你更像？", options: [{ text: "精确到分钟的计划", value: 'J' }, { text: "有明确时间节点", value: 'J' }, { text: "大致时间段安排", value: 'P' }, { text: "随缘自然进行", value: 'P' }] },
-            
-            // 补充题目 - 情感深度
-            { dimension: 'TF', question: "被影视作品感动时，你的反应是？", options: [{ text: "分析剧情合理性", value: 'T' }, { text: "思考逻辑是否严密", value: 'T' }, { text: "自然流泪，情绪共鸣", value: 'F' }, { text: "感受深刻，心情波动", value: 'F' }] },
-            { dimension: 'SN', question: "回忆往事，你的方式是？", options: [{ text: "想起具体事件", value: 'S' }, { text: "记得细节和对话", value: 'S' }, { text: "浮现整体感受", value: 'N' }, { text: "体会当时意境", value: 'N' }] },
-            { dimension: 'EI', question: "独处时，你通常？", options: [{ text: "感到无聊，想联系朋友", value: 'E' }, { text: "想找点社交活动", value: 'E' }, { text: "享受自己的时间", value: 'I' }, { text: "沉浸在自己的世界", value: 'I' }] },
-            { dimension: 'JP', question: "生活安排，你更喜欢？", options: [{ text: "有条不紊进行", value: 'J' }, { text: "按计划表执行", value: 'J' }, { text: "随意灵活处理", value: 'P' }, { text: "自由自在生活", value: 'P' }] },
-            
-            // 补充题目 - 终场题
-            { dimension: 'EI', question: "在社交疲惫后，你需要？", options: [{ text: "继续交流恢复", value: 'E' }, { text: "找人陪伴恢复", value: 'E' }, { text: "独处才能恢复", value: 'I' }, { text: "安静环境恢复", value: 'I' }] },
-            { dimension: 'SN', question: "面对复杂问题，你倾向？", options: [{ text: "拆解成具体步骤", value: 'S' }, { text: "逐步分析解决", value: 'S' }, { text: "寻找整体模式", value: 'N' }, { text: "发现内在联系", value: 'N' }] },
-            { dimension: 'TF', question: "他人评价对你影响？", options: [{ text: "理性看待，参考分析", value: 'T' }, { text: "客观判断，取舍参考", value: 'T' }, { text: "在意感受，影响情绪", value: 'F' }, { text: "重视态度，容易受伤", value: 'F' }] },
-            { dimension: 'JP', question: "人生规划，你更倾向？", options: [{ text: "明确目标路径", value: 'J' }, { text: "有清晰路线图", value: 'J' }, { text: "保持开放可能", value: 'P' }, { text: "边走边看调整", value: 'P' }] }
-        ];
+        // ==================== 动态加载题库 ====================
+        let allQuestions = []; // 从常量改为变量
+        let questionVersion = '1.0'; // 版本号从JSON读取
+
+        // 加载题库函数
+        async function loadQuestions() {
+            try {
+                // 加时间戳防止缓存
+                const response = await fetch('./questions.json?v=' + Date.now());
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // 检查更新锁
+                if (data.updateLock) {
+                    console.warn('[Questions] 题库正在维护中');
+                    showToast('题库正在更新，请稍后再试', 5000);
+                    return false;
+                }
+                
+                questionVersion = data.version || '1.0';
+                allQuestions = data.questions || [];
+                
+                // 更新版本号显示
+                document.getElementById('versionNumber').textContent = questionVersion;
+                document.getElementById('questionCount').textContent = allQuestions.length;
+                
+                console.log(`[Questions] 加载成功，版本${questionVersion}，共${allQuestions.length}道题`);
+                
+                // 题库完整性检查
+                if (allQuestions.length < QUESTIONS_PER_TEST) {
+                    console.error('[Questions] 题库数量不足，使用备用题库');
+                    showToast('题库加载异常，使用默认题目', 5000);
+                    loadBackupQuestions();
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('[Questions] 加载失败:', error);
+                showToast('题库加载失败，使用默认题目', 5000);
+                loadBackupQuestions();
+                return false;
+            }
+        }
+
+        // 备用题库（防止JSON加载失败）
+        function loadBackupQuestions() {
+            allQuestions = [
+                {"dimension": "EI", "question": "在社交聚会中，你通常如何表现？", "options": [{"text": "主动与多人交谈，享受成为焦点", "value": "E"}, {"text": "与少数几个人深入交流", "value": "E"}, {"text": "观察他人，偶尔参与对话", "value": "I"}, {"text": "找安静的角落，期待早点离开", "value": "I"}]},
+                {"dimension": "SN", "question": "描述一次旅行经历时，你会强调？", "options": [{"text": "具体行程、美食和风景细节", "value": "S"}, {"text": "实际花费和实用建议", "value": "S"}, {"text": "文化感悟和心灵收获", "value": "N"}, {"text": "旅行意义和人生启发", "value": "N"}]},
+                {"dimension": "TF", "question": "做决定时，什么对你更重要？", "options": [{"text": "逻辑分析和客观事实", "value": "T"}, {"text": "公平原则和效率最大化", "value": "T"}, {"text": "个人价值观和他人感受", "value": "F"}, {"text": "和谐氛围和情感影响", "value": "F"}]},
+                {"dimension": "JP", "question": "你的工作和生活习惯更倾向于？", "options": [{"text": "制定详细计划并严格执行", "value": "J"}, {"text": "有大致框架，按计划进行", "value": "J"}, {"text": "保持灵活性，随时调整", "value": "P"}, {"text": "随性而为，享受未知惊喜", "value": "P"}]}
+            ];
+            document.getElementById('versionNumber').textContent = '备用';
+            document.getElementById('questionCount').textContent = allQuestions.length;
+        }
+
+        // 手动热更新按钮
+        async function reloadQuestions() {
+            showToast('正在检查题库更新...', 2000);
+            const success = await loadQuestions();
+            if (success) {
+                showToast(`题库已更新至 ${questionVersion}，共${allQuestions.length}题`, 3000);
+            }
+        }
         // =================================================
 
-        // ==================== 完整植物人格数据（16种） ====================
+        // ==================== 植物人格数据（保持不变） ====================
         const plantPersonalities = {
-            'INTJ': {
-                name: '百岁兰',
-                latin: 'Welwitschia mirabilis',
-                icon: '🌵',
-                description: '你如同沙漠中坚韧的百岁兰，独立而理性。在爱情中，你以独特方式表达深情——用行动而非言语守护挚爱，为共同未来精心规划。你的爱是深沉而可靠的，像地底暗河般表面静默，内里炽热。你以孤高的姿态守护内心的圣殿，只为那个能读懂你沉默的人绽放。',
-                traits: ['战略远见', '独立自主', '完美主义', '长期主义', '深度专注'],
-                scientificBasis: 'INTJ（建筑师型）在MBTI中占人口2%。你的前额叶皮层活跃度较高，这与复杂问题解决和战略规划能力相关。神经科学研究表明，你的默认模式网络连接性独特，使你能于寂静中构建复杂理论，于孤独中创造不朽价值。'
-            },
-            'INTP': {
-                name: '茅膏菜',
-                latin: 'Drosera',
-                icon: '🌿',
-                description: '你是那株智慧而神秘的茅膏菜，用逻辑的显微镜观察情感世界。在爱情中，你用理论和创意构建独特的关系模式，以新颖观点启发伴侣。你的爱是诗意的实验，是理性的浪漫，是在平凡中发现非凡的艺术。你总能从不同角度看待事物，让爱充满智慧与惊喜。',
-                traits: ['逻辑分析', '创新思维', '知识探索', '适应性强', '独立思考'],
-                scientificBasis: 'INTP（逻辑学家型）占人口3%。你的默认模式网络连接性更强，支持内省和联想思维。fMRI显示你在发散思维任务中脑部活动多样性高，特别是在颞顶联合区（TPJ）区域，这使你在爱情中持续创造新鲜感。'
-            },
-            'ENTJ': {
-                name: '葛根',
-                latin: 'Pueraria lobata',
-                icon: '🌿',
-                description: '你如同那势不可挡的葛根，以果断和行动力开拓生命疆域。在爱情中，你是执剑的骑士，以果敢守护挚爱；你是筑城的工匠，用责任搭建坚实未来。你的爱是征服，更是庇护；是引领，更是成就。你让所爱之人如藤蔓攀附于你坚实的枝干，共同抵达更高处。',
-                traits: ['领导能力', '战略远见', '高效执行', '决策果断', '目标导向'],
-                scientificBasis: 'ENTJ（指挥官型）约占人口3%。你的多巴胺奖励系统活跃度超常，驱动你追求成就与掌控。fMRI研究表明，你的前扣带皮层在冲突监测中表现卓越，使你在爱情中能快速决策，带领伴侣穿越迷雾抵达理想彼岸。'
-            },
-            'ENTP': {
-                name: '捕蝇草',
-                latin: 'Dionaea muscipula',
-                icon: '🌸',
-                description: '你是那株机智迷人的捕蝇草，以巧妙陷阱捕获智慧火花。在爱情中，你是永不疲倦的游戏者，用创意谜题吸引灵魂伴侣；你是解构传统的艺术家，让每一刻充满惊喜。你的爱是永不停歇的探险，是智力与情感的双重奏鸣，是在凡俗中创造的永恒奇迹。',
-                traits: ['创新思维', '辩论能力', '机智幽默', '适应性强', '好奇心旺盛'],
-                scientificBasis: 'ENTP（辩论家型）占人口5%。你的颞顶联合区在发散思维任务中活跃度极高，使你能在爱情中持续创造新鲜感。研究显示，你的前脑岛对新颖社交线索异常敏感，让你成为天生的魅力制造者，让伴侣的生活永不乏味。'
-            },
-            'INFJ': {
-                name: '芦荟',
-                latin: 'Aloe vera',
-                icon: '🌱',
-                description: '你如同朴实无华的芦荟，内心蕴藏治愈天地的灵药。在爱情中，你是默默守护的月光，以无私温柔包裹爱人的疲惫；你是深夜的明灯，为迷途灵魂指引归途。你的爱是治愈，是理解，是在无声处听惊雷的深刻懂得。你拥有超凡共情力，能感知伴侣未说出口的需求。',
-                traits: ['同理心强', '洞察力强', '理想主义', '治愈能力', '深思熟虑'],
-                scientificBasis: 'INFJ（提倡者型）仅占人口1.5%。你的镜像神经元系统活跃度远超常人，赋予你超凡共情能力。fMRI研究表明，你的默认模式网络在理解他人情绪时展现独特模式，使你能如读心般感知伴侣需求，成为爱情中的灵魂医者。'
-            },
-            'INFP': {
-                name: '含羞草',
-                latin: 'Mimosa pudica',
-                icon: '🍃',
-                description: '你是那株敏感诗意的含羞草，叶片轻颤间藏着宇宙温柔。在爱情中，你是易碎的琉璃，需以柔软手心呵护；你是不竭泉源，用纯真与理想滋养关系的每一寸土壤。你的爱是奋不顾身的投入，是至纯至真的奉献，是在喧嚣中守护的一片净土。',
-                traits: ['理想主义', '创意丰富', '情感细腻', '价值观驱动', '内省深刻'],
-                scientificBasis: 'INFP（调停者型）占人口4.5%。你的情绪处理网络（杏仁核-前额叶连接）异常发达，使情感体验如诗歌般丰富。神经科学揭示，你的默认模式网络在自我反思时高度活跃，让你在爱情中既是深情诗人，也是理想主义追梦人。'
-            },
-            'ENFJ': {
-                name: '橄榄树',
-                latin: 'Olea europaea',
-                icon: '🌳',
-                description: '你如同千年橄榄树，以博大胸怀荫庇万物，以智慧年轮见证时光。在爱情中，你是引领方向的北斗，以远见规划共同未来；你是永不枯竭的泉源，用持续鼓励让爱人茁壮成长。你的爱是成就，是引领，是让所爱之人成为更好的自己的不竭动力。',
-                traits: ['领导魅力', '激励他人', '和谐追求', '长期视角', '社会责任感'],
-                scientificBasis: 'ENFJ（主人公型）占人口3.5%。你的前脑岛皮层在观察他人情绪时激活程度极高，配合强大的镜像神经元系统，使你成为天生的关系协调者。社会神经科学研究表明，你在爱情中既是激励者也是守护者，能带领伴侣共同成长。'
-            },
-            'ENFP': {
-                name: '幸运竹',
-                latin: 'Dracaena sanderiana',
-                icon: '🎋',
-                description: '你是那一竿柔韧的幸运竹，在任何环境都能舒展生命绿意。在爱情中，你是永不疲倦的探险家，用无穷想象力为平凡日子镀上金边；你是传递快乐的精灵，总能在阴霾中发现彩虹。你的爱是自由，是创造，是携手共赴的永无止境的奇妙旅程。',
-                traits: ['热情洋溢', '创意无限', '适应力强', '社交能力', '乐观积极'],
-                scientificBasis: 'ENFP（竞选者型）占人口7.5%。你的背外侧前额叶皮层与边缘系统连接独特，使创造性思维与情感深度完美结合。神经影像学显示，你的奖赏系统对积极社交体验极度敏感，让你在爱情中既是快乐源泉，也是创意引擎。'
-            },
-            'ISTJ': {
-                name: '银杏',
-                latin: 'Ginkgo biloba',
-                icon: '🍂',
-                description: '你如穿越亿万年时光的古银杏，以不变姿态守护岁月承诺。在爱情中，你是永恒灯塔，以稳定照亮指引迷航；你是古老契约，每一句誓言都镌刻年轮深处。你的爱是沉默坚守，是无声付出，是在时光流转中永不褪色的忠诚。',
-                traits: ['责任感强', '精准可靠', '传统价值', '秩序井然', '记忆力佳'],
-                scientificBasis: 'ISTJ（物流师型）占人口12%。你的执行控制网络（ECN）活动一致性极高，使你在爱情中成为值得信赖的伴侣。认知神经科学研究表明，你的海马体与前额叶连接强大，让你能铭记重要时刻，将承诺化为永恒。'
-            },
-            'ISFJ': {
-                name: '薰衣草',
-                latin: 'Lavandula',
-                icon: '🌾',
-                description: '你是那丛温柔坚韧的薰衣草，以紫色浪漫疗愈世界疲惫。在爱情中，你是永不熄灭的暖炉，用持续温柔驱散生活寒意；你是珍藏记忆的香囊，将每一刻美好酿成永恒芬芳。你的爱是守护，是治愈，是在平凡中创造的不凡温情。',
-                traits: ['关怀他人', '和谐追求', '记忆力强', '实践性强', '忠诚可靠'],
-                scientificBasis: 'ISFJ（守卫者型）占人口9%。你的默认模式网络在处理社会性刺激时表现出稳定情感关怀模式。神经影像学研究显示，你的前脑岛皮层对伴侣需求极度敏感，让你成为爱情中的天然守护者，以细腻体贴创造持久温暖。'
-            },
-            'ESTJ': {
-                name: '竹子',
-                latin: 'Bambusoideae',
-                icon: '🎋',
-                description: '你如挺拔翠竹，以节节攀升姿态追求卓越。在爱情中，你是构筑家园的工匠，用行动搭建坚实未来；你是制定航程的舵手，带领伴侣穿越风浪抵达理想港湾。你的爱是行动，是责任，是将承诺化为每一天具体付出的可靠。',
-                traits: ['组织能力', '高效执行', '决策果断', '秩序感强', '领导能力'],
-                scientificBasis: 'ESTJ（总经理型）占人口11%。你的前扣带皮层（ACC）在冲突监测中异常活跃，使你能快速解决爱情中的问题。研究表明，你的执行控制网络让你在关系中既能果断决策，又能承担责任，成为伴侣信赖的依靠。'
-            },
-            'ESFJ': {
-                name: '向日葵',
-                latin: 'Helianthus annuus',
-                icon: '🌻',
-                description: '你是那朵追随光明的向日葵，以灿烂笑容温暖世界。在爱情中，你是营造温馨的魔法师，将平凡日子过成诗；你是凝聚情感的磁石，让两颗心紧密相依。你的爱是奉献，是包容，是创造和谐幸福的不竭动力。',
-                traits: ['社交能力强', '合作精神', '关怀他人', '乐观积极', '组织才能'],
-                scientificBasis: 'ESFJ（执政官型）占人口12%。你的颞上沟（STS）在面部情绪识别中准确率极高，配合强大的镜像神经元系统，使你如阳光般照亮伴侣心情。社会心理学研究显示，你是爱情中的天然协调者，以关怀与体贴营造持久和谐。'
-            },
-            'ISTP': {
-                name: '仙人掌',
-                latin: 'Cactaceae',
-                icon: '🌵',
-                description: '你如孤傲自在的仙人掌，在沙漠中演绎自给自足美学。在爱情中，你是沉默守护者，用行动而非言语表达深情；你是可靠技师，总能在生活出故障时妙手回春。你的爱是低调的可靠，是静默的守护，是在关键时刻挺身而出的英雄主义。',
-                traits: ['实践能力强', '冷静理性', '适应力强', '独立自主', '问题解决'],
-                scientificBasis: 'ISTP（鉴赏家型）占人口6%。你的感觉运动皮层与顶叶皮层连接独特，赋予你出色操作技能。神经科学研究表明，你在爱情中既是沉默行动者，也是可靠守护者，以实用主义创造稳健关系。'
-            },
-            'ISFP': {
-                name: '兰花',
-                latin: 'Orchidaceae',
-                icon: '🌺',
-                description: '你是那朵独特优雅的兰花，以不可思议的美丽诠释生命高贵。在爱情中，你是追求纯粹美学的诗人，将情感化为视觉与听觉的盛宴；你是活在当下的哲学家，让每一个相视而笑的瞬间都成为永恒。你的爱是美的创造，是感官的诗篇。',
-                traits: ['艺术感知', '审美独特', '和谐追求', '活在当下', '敏感细腻'],
-                scientificBasis: 'ISFP（探险家型）占人口7%。你的视觉皮层与边缘系统连接异常发达，使感官输入化为情感美学体验。fMRI研究显示，你的审美感知网络高度整合，让你在爱情中既是美的创造者，也是情感的鉴赏家。'
-            },
-            'ESTP': {
-                name: '藤蔓',
-                latin: 'Liana',
-                icon: '🌿',
-                description: '你如柔韧迅猛的藤蔓，以惊人适应能力攀缘生命每一个机遇。在爱情中，你是制造惊喜的魔术师，总能让平凡日子闪耀火花；你是引领冒险的船长，与爱人共赴未知蓝海。你的爱是激情，是体验，是在每一个当下刻下最深印记的勇敢。',
-                traits: ['行动力强', '应变快速', '实践智慧', '冒险精神', '社交能力'],
-                scientificBasis: 'ESTP（企业家型）占人口5%。你的多巴胺奖赏系统对刺激极度敏感，驱使你不断寻求新鲜体验。研究表明，你在爱情中既是冒险引领者，也是快乐制造者，以实践智慧和行动力创造充满活力关系。'
-            },
-            'ESFP': {
-                name: '郁金香',
-                latin: 'Tulipa',
-                icon: '🌷',
-                description: '你是早春最早绽放的郁金香，以无与伦比热情宣告生命喜悦。在爱情中，你是永不疲倦的表演者，用热情和创意点亮每一天；你是传递快乐的使者，让爱在欢声笑语中如花绚烂。你的爱是光芒，是温度，是携手共舞的永不落幕的盛宴。',
-                traits: ['热情活力', '表现力佳', '乐观开朗', '社交能力', '当下欢愉'],
-                scientificBasis: 'ESFP（表演者型）占人口7.5%。你的奖赏系统与情感处理区域基线活动水平较高，使你对积极社交体验极为敏感。神经科学研究表明，你在爱情中既是快乐源泉，也是社交磁石，以感染力创造充满欢笑的关系。'
-            }
+            'INTJ': { name: '百岁兰', latin: 'Welwitschia mirabilis', icon: '🌵', description: '你如同沙漠中坚韧的百岁兰，独立而理性。在爱情中，你以独特方式表达深情——用行动而非言语守护挚爱，为共同未来精心规划。你的爱是深沉而可靠的，像地底暗河般表面静默，内里炽热。你以孤高的姿态守护内心的圣殿，只为那个能读懂你沉默的人绽放。', traits: ['战略远见', '独立自主', '完美主义', '长期主义', '深度专注'], scientificBasis: 'INTJ（建筑师型）在MBTI中占人口2%。你的前额叶皮层活跃度较高，这与复杂问题解决和战略规划能力相关。神经科学研究表明，你的默认模式网络连接性独特，使你能于寂静中构建复杂理论，于孤独中创造不朽价值。' },
+            'INTP': { name: '茅膏菜', latin: 'Drosera', icon: '🌿', description: '你是那株智慧而神秘的茅膏菜，用逻辑的显微镜观察情感世界。在爱情中，你用理论和创意构建独特的关系模式，以新颖观点启发伴侣。你的爱是诗意的实验，是理性的浪漫，是在平凡中发现非凡的艺术。你总能从不同角度看待事物，让爱充满智慧与惊喜。', traits: ['逻辑分析', '创新思维', '知识探索', '适应性强', '独立思考'], scientificBasis: 'INTP（逻辑学家型）占人口3%。你的默认模式网络连接性更强，支持内省和联想思维。fMRI显示你在发散思维任务中脑部活动多样性高，特别是在颞顶联合区（TPJ）区域，这使你在爱情中持续创造新鲜感。' },
+            'ENTJ': { name: '葛根', latin: 'Pueraria lobata', icon: '🌿', description: '你如同那势不可挡的葛根，以果断和行动力开拓生命疆域。在爱情中，你是执剑的骑士，以果敢守护挚爱；你是筑城的工匠，用责任搭建坚实未来。你的爱是征服，更是庇护；是引领，更是成就。你让所爱之人如藤蔓攀附于你坚实的枝干，共同抵达更高处。', traits: ['领导能力', '战略远见', '高效执行', '决策果断', '目标导向'], scientificBasis: 'ENTJ（指挥官型）约占人口3%。你的多巴胺奖励系统活跃度超常，驱动你追求成就与掌控。fMRI研究表明，你的前扣带皮层在冲突监测中表现卓越，使你在爱情中能快速决策，带领伴侣穿越迷雾抵达理想彼岸。' },
+            'ENTP': { name: '捕蝇草', latin: 'Dionaea muscipula', icon: '🌸', description: '你是那株机智迷人的捕蝇草，以巧妙陷阱捕获智慧火花。在爱情中，你是永不疲倦的游戏者，用创意谜题吸引灵魂伴侣；你是解构传统的艺术家，让每一刻充满惊喜。你的爱是永不停歇的探险，是智力与情感的双重奏鸣，是在凡俗中创造的永恒奇迹。', traits: ['创新思维', '辩论能力', '机智幽默', '适应性强', '好奇心旺盛'], scientificBasis: 'ENTP（辩论家型）占人口5%。你的颞顶联合区在发散思维任务中活跃度极高，使你能在爱情中持续创造新鲜感。研究显示，你的前脑岛对新颖社交线索异常敏感，让你成为天生的魅力制造者，让伴侣的生活永不乏味。' },
+            'INFJ': { name: '芦荟', latin: 'Aloe vera', icon: '🌱', description: '你如同朴实无华的芦荟，内心蕴藏治愈天地的灵药。在爱情中，你是默默守护的月光，以无私温柔包裹爱人的疲惫；你是深夜的明灯，为迷途灵魂指引归途。你的爱是治愈，是理解，是在无声处听惊雷的深刻懂得。你拥有超凡共情力，能感知伴侣未说出口的需求。', traits: ['同理心强', '洞察力强', '理想主义', '治愈能力', '深思熟虑'], scientificBasis: 'INFJ（提倡者型）仅占人口1.5%。你的镜像神经元系统活跃度远超常人，赋予你超凡共情能力。fMRI研究表明，你的默认模式网络在理解他人情绪时展现独特模式，使你能如读心般感知伴侣需求，成为爱情中的灵魂医者。' },
+            'INFP': { name: '含羞草', latin: 'Mimosa pudica', icon: '🍃', description: '你是那株敏感诗意的含羞草，叶片轻颤间藏着宇宙温柔。在爱情中，你是易碎的琉璃，需以柔软手心呵护；你是不竭泉源，用纯真与理想滋养关系的每一寸土壤。你的爱是奋不顾身的投入，是至纯至真的奉献，是在喧嚣中守护的一片净土。', traits: ['理想主义', '创意丰富', '情感细腻', '价值观驱动', '内省深刻'], scientificBasis: 'INFP（调停者型）占人口4.5%。你的情绪处理网络（杏仁核-前额叶连接）异常发达，使情感体验如诗歌般丰富。神经科学揭示，你的默认模式网络在自我反思时高度活跃，让你在爱情中既是深情诗人，也是理想主义追梦人。' },
+            'ENFJ': { name: '橄榄树', latin: 'Olea europaea', icon: '🌳', description: '你如同千年橄榄树，以博大胸怀荫庇万物，以智慧年轮见证时光。在爱情中，你是引领方向的北斗，以远见规划共同未来；你是永不枯竭的泉源，用持续鼓励让爱人茁壮成长。你的爱是成就，是引领，是让所爱之人成为更好的自己的不竭动力。', traits: ['领导魅力', '激励他人', '和谐追求', '长期视角', '社会责任感'], scientificBasis: 'ENFJ（主人公型）占人口3.5%。你的前脑岛皮层在观察他人情绪时激活程度极高，配合强大的镜像神经元系统，使你成为天生的关系协调者。社会神经科学研究表明，你在爱情中既是激励者也是守护者，能带领伴侣共同成长。' },
+            'ENFP': { name: '幸运竹', latin: 'Dracaena sanderiana', icon: '🎋', description: '你是那一竿柔韧的幸运竹，在任何环境都能舒展生命绿意。在爱情中，你是永不疲倦的探险家，用无穷想象力为平凡日子镀上金边；你是传递快乐的精灵，总能在阴霾中发现彩虹。你的爱是自由，是创造，是携手共赴的永无止境的奇妙旅程。', traits: ['热情洋溢', '创意无限', '适应力强', '社交能力', '乐观积极'], scientificBasis: 'ENFP（竞选者型）占人口7.5%。你的背外侧前额叶皮层与边缘系统连接独特，使创造性思维与情感深度完美结合。神经影像学显示，你的奖赏系统对积极社交体验极度敏感，让你在爱情中既是快乐源泉，也是创意引擎。' },
+            'ISTJ': { name: '银杏', latin: 'Ginkgo biloba', icon: '🍂', description: '你如穿越亿万年时光的古银杏，以不变姿态守护岁月承诺。在爱情中，你是永恒灯塔，以稳定照亮指引迷航；你是古老契约，每一句誓言都镌刻年轮深处。你的爱是沉默坚守，是无声付出，是在时光流转中永不褪色的忠诚。', traits: ['责任感强', '精准可靠', '传统价值', '秩序井然', '记忆力佳'], scientificBasis: 'ISTJ（物流师型）占人口12%。你的执行控制网络（ECN）活动一致性极高，使你在爱情中成为值得信赖的伴侣。认知神经科学研究表明，你的海马体与前额叶连接强大，让你能铭记重要时刻，将承诺化为永恒。' },
+            'ISFJ': { name: '薰衣草', latin: 'Lavandula', icon: '🌾', description: '你是那丛温柔坚韧的薰衣草，以紫色浪漫疗愈世界疲惫。在爱情中，你是永不熄灭的暖炉，用持续温柔驱散生活寒意；你是珍藏记忆的香囊，将每一刻美好酿成永恒芬芳。你的爱是守护，是治愈，是在平凡中创造的不凡温情。', traits: ['关怀他人', '和谐追求', '记忆力强', '实践性强', '忠诚可靠'], scientificBasis: 'ISFJ（守卫者型）占人口9%。你的默认模式网络在处理社会性刺激时表现出稳定情感关怀模式。神经影像学研究显示，你的前脑岛皮层对伴侣需求极度敏感，让你成为爱情中的天然守护者，以细腻体贴创造持久温暖。' },
+            'ESTJ': { name: '竹子', latin: 'Bambusoideae', icon: '🎋', description: '你如挺拔翠竹，以节节攀升姿态追求卓越。在爱情中，你是构筑家园的工匠，用行动搭建坚实未来；你是制定航程的舵手，带领伴侣穿越风浪抵达理想港湾。你的爱是行动，是责任，是将承诺化为每一天具体付出的可靠。', traits: ['组织能力', '高效执行', '决策果断', '秩序感强', '领导能力'], scientificBasis: 'ESTJ（总经理型）占人口11%。你的前扣带皮层（ACC）在冲突监测中异常活跃，使你能快速解决爱情中的问题。研究表明，你的执行控制网络让你在关系中既能果断决策，又能承担责任，成为伴侣信赖的依靠。' },
+            'ESFJ': { name: '向日葵', latin: 'Helianthus annuus', icon: '🌻', description: '你是那朵追随光明的向日葵，以灿烂笑容温暖世界。在爱情中，你是营造温馨的魔法师，将平凡日子过成诗；你是凝聚情感的磁石，让两颗心紧密相依。你的爱是奉献，是包容，是创造和谐幸福的不竭动力。', traits: ['社交能力强', '合作精神', '关怀他人', '乐观积极', '组织才能'], scientificBasis: 'ESFJ（执政官型）占人口12%。你的颞上沟（STS）在面部情绪识别中准确率极高，配合强大的镜像神经元系统，使你如阳光般照亮伴侣心情。社会心理学研究显示，你是爱情中的天然协调者，以关怀与体贴营造持久和谐。' },
+            'ISTP': { name: '仙人掌', latin: 'Cactaceae', icon: '🌵', description: '你如孤傲自在的仙人掌，在沙漠中演绎自给自足美学。在爱情中，你是沉默守护者，用行动而非言语表达深情；你是可靠技师，总能在生活出故障时妙手回春。你的爱是低调的可靠，是静默的守护，是在关键时刻挺身而出的英雄主义。', traits: ['实践能力强', '冷静理性', '适应力强', '独立自主', '问题解决'], scientificBasis: 'ISTP（鉴赏家型）占人口6%。你的感觉运动皮层与顶叶皮层连接独特，赋予你出色操作技能。神经科学研究表明，你在爱情中既是沉默行动者，也是可靠守护者，以实用主义创造稳健关系。' },
+            'ISFP': { name: '兰花', latin: 'Orchidaceae', icon: '🌺', description: '你是那朵独特优雅的兰花，以不可思议的美丽诠释生命高贵。在爱情中，你是追求纯粹美学的诗人，将情感化为视觉与听觉的盛宴；你是活在当下的哲学家，让每一个相视而笑的瞬间都成为永恒。你的爱是美的创造，是感官的诗篇。', traits: ['艺术感知', '审美独特', '和谐追求', '活在当下', '敏感细腻'], scientificBasis: 'ISFP（探险家型）占人口7%。你的视觉皮层与边缘系统连接异常发达，使感官输入化为情感美学体验。fMRI研究显示，你的审美感知网络高度整合，让你在爱情中既是美的创造者，也是情感的鉴赏家。' },
+            'ESTP': { name: '藤蔓', latin: 'Liana', icon: '🌿', description: '你如柔韧迅猛的藤蔓，以惊人适应能力攀缘生命每一个机遇。在爱情中，你是制造惊喜的魔术师，总能让平凡日子闪耀火花；你是引领冒险的船长，与爱人共赴未知蓝海。你的爱是激情，是体验，是在每一个当下刻下最深印记的勇敢。', traits: ['行动力强', '应变快速', '实践智慧', '冒险精神', '社交能力'], scientificBasis: 'ESTP（企业家型）占人口5%。你的多巴胺奖赏系统对刺激极度敏感，驱使你不断寻求新鲜体验。研究表明，你在爱情中既是冒险引领者，也是快乐制造者，以实践智慧和行动力创造充满活力关系。' },
+            'ESFP': { name: '郁金香', latin: 'Tulipa', icon: '🌷', description: '你是早春最早绽放的郁金香，以无与伦比热情宣告生命喜悦。在爱情中，你是永不疲倦的表演者，用热情和创意点亮每一天；你是传递快乐的使者，让爱在欢声笑语中如花绚烂。你的爱是光芒，是温度，是携手共舞的永不落幕的盛宴。', traits: ['热情活力', '表现力佳', '乐观开朗', '社交能力', '当下欢愉'], scientificBasis: 'ESFP（表演者型）占人口7.5%。你的奖赏系统与情感处理区域基线活动水平较高，使你对积极社交体验极为敏感。神经科学研究表明，你在爱情中既是快乐源泉，也是社交磁石，以感染力创造充满欢笑的关系。' }
         };
         // =================================================
 
@@ -719,7 +576,6 @@
         // ==================== 监控埋点 ====================
         function trackEvent(eventName, params = {}) {
             console.log(`[Track] ${eventName}`, params);
-            // 实际接入：window.gtag?.('event', eventName, params);
         }
         // =================================================
 
@@ -731,7 +587,8 @@
                 currentQuestion,
                 answers,
                 selectedQuestions,
-                questionCount: selectedQuestions.length
+                questionCount: selectedQuestions.length,
+                version: questionVersion // 保存版本号
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(progressData));
             console.log('[Storage] 进度已保存');
@@ -745,14 +602,19 @@
             try {
                 const data = JSON.parse(saved);
                 const age = Date.now() - data.timestamp;
-                const maxAge = 24 * 60 * 60 * 1000; // 24小时有效期
+                const maxAge = 24 * 60 * 60 * 1000;
 
                 if (age > maxAge) {
                     localStorage.removeItem(STORAGE_KEY);
                     return false;
                 }
 
-                // 显示恢复提示
+                // 版本不匹配时不恢复
+                if (data.version && data.version !== questionVersion) {
+                    console.log('[Storage] 版本不匹配，不恢复进度');
+                    return false;
+                }
+
                 const notice = document.getElementById('restoreNotice');
                 const timeStr = new Date(data.timestamp).toLocaleString('zh-CN');
                 document.getElementById('lastTestTime').textContent = timeStr;
@@ -798,9 +660,9 @@
         // =================================================
 
         // ==================== 随机抽题算法 ====================
-        // Fisher-Yates洗牌算法（确保不重复）
+        // Fisher-Yates洗牌算法
         function shuffleArray(array) {
-            const arr = [...array]; // 创建副本
+            const arr = [...array];
             for (let i = arr.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [arr[i], arr[j]] = [arr[j], arr[i]];
@@ -808,7 +670,7 @@
             return arr;
         }
 
-        // 抽取题目（绝对不重复）
+        // 抽取题目
         function getRandomQuestions(count = QUESTIONS_PER_TEST) {
             if (count > allQuestions.length) {
                 console.warn('[Questions] 请求数量超过题库，返回全部题目');
@@ -861,11 +723,20 @@
 
         // 开始测试
         async function startTest() {
-            trackEvent('test_start', { questionCount: QUESTIONS_PER_TEST });
+            // 检查题库是否加载完成
+            if (allQuestions.length === 0) {
+                showToast('题库正在加载中，请稍候...', 2000);
+                return;
+            }
+
+            trackEvent('test_start', { 
+                questionCount: QUESTIONS_PER_TEST,
+                version: questionVersion 
+            });
             
             setButtonLoading('startBtn', true);
             
-            // 模拟异步加载（提升体验）
+            // 模拟异步加载
             await new Promise(resolve => setTimeout(resolve, 500));
             
             selectedQuestions = getRandomQuestions(QUESTIONS_PER_TEST);
@@ -985,7 +856,7 @@
             }
         }
 
-        // 计算MBTI结果（核心修复）
+        // 计算MBTI结果
         function calculateResult() {
             const dimensionScores = { E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 };
             
@@ -1031,7 +902,7 @@
                 JP: dimensionScores.J >= dimensionScores.P ? 'J' : 'P'
             };
             
-            // 处理平局（按MBTI理论倾向）
+            // 处理平局
             if (dimensionScores.E === dimensionScores.I) result.EI = 'I';
             if (dimensionScores.S === dimensionScores.N) result.SN = 'N';
             if (dimensionScores.T === dimensionScores.F) result.TF = 'F';
@@ -1044,7 +915,7 @@
             if (!plantPersonalities[finalType]) {
                 console.error('[Result] 计算出的类型不存在:', finalType);
                 trackEvent('result_type_error', { type: finalType });
-                return 'ESFJ'; // 兜底类型
+                return 'ESFJ';
             }
             
             trackEvent('result_calculated', { 
@@ -1072,14 +943,12 @@
             document.getElementById('testScreen').style.display = 'none';
             document.getElementById('resultScreen').style.display = 'block';
             
-            // 填充结果数据
             document.getElementById('plantIcon').textContent = plantData.icon;
             document.getElementById('plantName').textContent = plantData.name;
             document.getElementById('plantLatin').textContent = plantData.latin;
             document.getElementById('personalityType').textContent = `${personalityType} - ${getTypeDescription(personalityType)}`;
             document.getElementById('description').textContent = plantData.description;
             
-            // 显示特质标签
             const traitsList = document.getElementById('traitsList');
             traitsList.innerHTML = '';
             plantData.traits.forEach(trait => {
@@ -1160,7 +1029,6 @@
                     showToast('结果已复制到剪贴板，快去分享吧！');
                     trackEvent('share_success', { method: 'clipboard' });
                 }).catch(() => {
-                    // 降级方案
                     const textarea = document.createElement('textarea');
                     textarea.value = shareContent;
                     document.body.appendChild(textarea);
@@ -1179,7 +1047,6 @@
         document.addEventListener('keydown', (e) => {
             if (document.getElementById('testScreen').style.display === 'none') return;
             
-            // 节流
             if (keyThrottleTimer) return;
             
             if (e.key === 'ArrowLeft' && !document.getElementById('prevBtn').disabled) {
@@ -1199,7 +1066,10 @@
         // =================================================
 
         // ==================== 页面加载 ====================
-        window.addEventListener('load', () => {
+        window.addEventListener('load', async () => {
+            // 先加载题库
+            await loadQuestions();
+            
             // 检查可恢复进度
             checkRestoreProgress();
             
@@ -1221,6 +1091,9 @@
                     e.returnValue = `测试进度将丢失，确定要离开吗？（已完成 ${progress}%）`;
                 }
             });
+            
+            // 显示当前版本信息
+            console.log(`[System] 植物人格分析系统已就绪 | 版本: ${questionVersion} | 题库: ${allQuestions.length}题`);
         });
         // =================================================
     </script>
