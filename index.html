@@ -4,11 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>植物人格分析 - 发现你的内在植物</title>
+    
+    <!-- SEO与分享优化 -->
+    <meta name="description" content="基于MBTI人格理论的趣味心理测试，用植物定义你的性格特质，科学严谨又不失浪漫">
+    <meta property="og:title" content="植物人格分析 - 发现你的内在植物">
+    <meta property="og:description" content="基于MBTI理论的趣味心理测试，用植物定义你的性格特质">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent; /* 移除移动端点击高亮 */
+            user-select: none; /* 防止误选文字 */
         }
 
         body {
@@ -17,6 +27,8 @@
             min-height: 100vh;
             color: #2d3a2d;
             line-height: 1.6;
+            -webkit-font-smoothing: antialiased; /* 字体抗锯齿 */
+            -moz-osx-font-smoothing: grayscale;
         }
 
         .container {
@@ -57,12 +69,41 @@
             border-radius: 30px;
             cursor: pointer;
             transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
         }
 
         .start-btn:hover {
             background: #2e7d32;
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(27, 94, 32, 0.3);
+        }
+
+        .start-btn:active {
+            transform: translateY(0);
+        }
+
+        .start-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 加载动画 */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ffffff;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         /* 测试页 */
@@ -131,6 +172,15 @@
 
         .option input[type="radio"] {
             margin-right: 15px;
+            pointer-events: none; /* 防止点击radio时事件冒泡问题 */
+        }
+
+        /* 移动端触摸反馈 */
+        @media (hover: none) {
+            .option:active {
+                transform: scale(0.98);
+                background: #e8f5e9;
+            }
         }
 
         .nav-buttons {
@@ -176,10 +226,19 @@
         .plant-icon {
             font-size: 5em;
             margin-bottom: 20px;
-            /* 优化emoji显示 */
             display: inline-block;
             line-height: 1;
+            /* 兜底方案：不支持filter的浏览器 */
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            /* 现代浏览器 */
             filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+            /* 动画效果 */
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
         }
 
         .plant-name {
@@ -247,6 +306,14 @@
             color: #5d4037;
         }
 
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+
         .restart-btn {
             background: #1b5e20;
             color: white;
@@ -254,12 +321,25 @@
             padding: 12px 30px;
             border-radius: 25px;
             cursor: pointer;
-            margin-top: 20px;
             transition: all 0.3s ease;
         }
 
         .restart-btn:hover {
             background: #2e7d32;
+        }
+
+        .share-btn {
+            background: #4a6350;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .share-btn:hover {
+            background: #5a7a62;
         }
 
         /* 动画 */
@@ -281,6 +361,30 @@
             .welcome-screen h1 {
                 font-size: 2em;
             }
+            
+            .button-group {
+                flex-direction: column;
+            }
+        }
+
+        /* 提示消息 */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2d3a2d;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
         }
     </style>
 </head>
@@ -290,9 +394,17 @@
         <div class="welcome-screen" id="welcomeScreen">
             <h1>🌱 植物人格分析 🌱</h1>
             <p>基于MBTI人格理论的科学研究，涵盖情感表达、爱情观念、人际交往等多维度，分析你的性格特质并用一种独特的植物定义你。每次测试题目不同，结果更具参考价值。</p>
-            <button class="start-btn" onclick="startTest()">开始测试</button>
+            <button class="start-btn" id="startBtn" onclick="startTest()">
+                <span id="startBtnText">开始测试</span>
+            </button>
             <div style="margin-top: 40px; padding: 20px; background: rgba(255,255,255,0.5); border-radius: 10px;">
                 <p style="font-size: 0.9em; color: #666;">理论基础：MBTI（迈尔斯-布里格斯类型指标）是基于卡尔·荣格心理类型理论的人格分类系统，被广泛应用于心理学研究和职业发展领域。</p>
+            </div>
+            
+            <!-- 恢复进度提示 -->
+            <div id="restoreNotice" style="margin-top: 20px; padding: 15px; background: #e8f5e9; border-radius: 10px; display: none; cursor: pointer;" onclick="restoreProgress()">
+                <p style="color: #1b5e20; font-weight: 500;">检测到之前的测试进度，点击恢复</p>
+                <small style="color: #4a6350;">上次测试时间：<span id="lastTestTime"></span></small>
             </div>
         </div>
 
@@ -324,23 +436,24 @@
                     <h3>🧬 科学依据</h3>
                     <p id="scientificBasis"></p>
                 </div>
-                <button class="restart-btn" onclick="restartTest()">重新测试</button>
+                <div class="button-group">
+                    <button class="restart-btn" onclick="restartTest()">重新测试</button>
+                    <button class="share-btn" onclick="shareResult()">分享结果</button>
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- 提示消息 -->
+    <div class="toast" id="toast"></div>
+
     <script>
         // ==================== 配置参数 ====================
-        // 每轮测试题目数量（可自由调整：20/50/100）
-        const QUESTIONS_PER_TEST = 50;
-        
-        // 题库总量（当前100题，可扩展至200题）
-        // 如需扩展，只需在allQuestions数组中追加题目即可
-        // 最大支持题库量：理论上无限制，但建议200题以内保证性能
-        const TOTAL_QUESTIONS = 100;
+        const QUESTIONS_PER_TEST = 50; // 可自由调整：20/50/100
+        const STORAGE_KEY = 'plantTest_progress_v1';
         // =================================================
 
-        // 100道MBTI问题数据库（约30%为爱情主题）
+        // ==================== 完整题库（100道题） ====================
         const allQuestions = [
             // 基础维度题 (EI)
             { dimension: 'EI', question: "在社交聚会中，你通常如何表现？", options: [{ text: "主动与多人交谈，享受成为焦点", value: 'E' }, { text: "与少数几个人深入交流", value: 'E' }, { text: "观察他人，偶尔参与对话", value: 'I' }, { text: "找安静的角落，期待早点离开", value: 'I' }] },
@@ -349,7 +462,7 @@
             { dimension: 'EI', question: "你的情感表达方式通常是？", options: [{ text: "外向直接，乐于分享感受", value: 'E' }, { text: "主动沟通，寻求共鸣", value: 'E' }, { text: "内敛含蓄，选择性表达", value: 'I' }, { text: "深藏心底，独自消化", value: 'I' }] },
             { dimension: 'EI', question: "在陌生环境中，你的社交策略是？", options: [{ text: "主动介绍自己，建立联系", value: 'E' }, { text: "观察后主动接近感兴趣的人", value: 'E' }, { text: "等待他人接近，谨慎回应", value: 'I' }, { text: "保持距离，专注于自己的事情", value: 'I' }] },
             
-            // 爱情主题题 (EI维度) - 适度浪漫
+            // 爱情主题题 (EI维度)
             { dimension: 'EI', question: "在爱情中，你更倾向于？", options: [{ text: "热烈表达，经常说我爱你", value: 'E' }, { text: "主动分享心情和想法", value: 'E' }, { text: "默默守护，用行动表达", value: 'I' }, { text: "独处沉淀，偶尔表达", value: 'I' }] },
             { dimension: 'EI', question: "与恋人争吵后，你会？", options: [{ text: "立即沟通，希望马上解决", value: 'E' }, { text: "主动和解，让关系回暖", value: 'E' }, { text: "冷静思考，需要时间平复", value: 'I' }, { text: "独处消化，等待合适时机", value: 'I' }] },
             { dimension: 'EI', question: "理想约会方式是？", options: [{ text: "热闹派对，享受氛围", value: 'E' }, { text: "朋友聚会，轻松愉快", value: 'E' }, { text: "二人世界，安静交流", value: 'I' }, { text: "独处共读，各自看书", value: 'I' }] },
@@ -361,7 +474,7 @@
             { dimension: 'SN', question: "学习新知识时，你更喜欢哪种方式？", options: [{ text: "循序渐进，从基础开始", value: 'S' }, { text: "结合实际案例和动手实践", value: 'S' }, { text: "先理解整体框架和理论", value: 'N' }, { text: "探索不同概念间的联系", value: 'N' }] },
             { dimension: 'SN', question: "你对朋友的承诺通常？", options: [{ text: "说到做到，重视实际行动", value: 'S' }, { text: "尽力兑现，考虑现实条件", value: 'S' }, { text: "理解精神内涵，灵活处理", value: 'N' }, { text: "看重意图，不拘泥形式", value: 'N' }] },
             
-            // 爱情主题题 (SN维度) - 适度浪漫
+            // 爱情主题题 (SN维度)
             { dimension: 'SN', question: "在爱情中，细节对你而言？", options: [{ text: "记得每一次约会和细节", value: 'S' }, { text: "比较在意，记得重要日子", value: 'S' }, { text: "更看重整体感觉和氛围", value: 'N' }, { text: "在意精神连接和心灵契合", value: 'N' }] },
             { dimension: 'SN', question: "回忆恋情时，你更记得？", options: [{ text: "第一次约会的具体场景", value: 'S' }, { text: "具体的承诺和约定", value: 'S' }, { text: "当时的情感和心情", value: 'N' }, { text: "关系带来的成长和变化", value: 'N' }] },
             { dimension: 'SN', question: "理想伴侣的特质是？", options: [{ text: "踏实可靠，行动证明爱", value: 'S' }, { text: "稳定温暖，细节关怀到位", value: 'S' }, { text: "有深度，能精神交流", value: 'N' }, { text: "有共同理想，一起探索", value: 'N' }] },
@@ -373,7 +486,7 @@
             { dimension: 'TF', question: "评价一部电影时，你最看重？", options: [{ text: "剧情逻辑和制作技术", value: 'T' }, { text: "故事结构和导演手法", value: 'T' }, { text: "情感共鸣和人物关系", value: 'F' }, { text: "价值观传达和内在意义", value: 'F' }] },
             { dimension: 'TF', question: "帮助他人时，你的出发点是？", options: [{ text: "这是正确且高效的做法", value: 'T' }, { text: "基于公平和理性判断", value: 'T' }, { text: "感同身受，不忍看到痛苦", value: 'F' }, { text: "希望传递温暖和善意", value: 'F' }] },
             
-            // 爱情主题题 (TF维度) - 适度浪漫
+            // 爱情主题题 (TF维度)
             { dimension: 'TF', question: "当你深爱一个人，你会如何表达？", options: [{ text: "理性规划未来，给出承诺", value: 'T' }, { text: "分析如何让关系更好", value: 'T' }, { text: "自然流露，温柔体贴", value: 'F' }, { text: "用心感受，温暖陪伴", value: 'F' }] },
             { dimension: 'TF', question: "恋人的缺点让你困扰时，你会？", options: [{ text: "理性沟通，寻求解决方案", value: 'T' }, { text: "客观分析，提出改进建议", value: 'T' }, { text: "包容接纳，用爱化解", value: 'F' }, { text: "理解并温暖地陪伴成长", value: 'F' }] },
             { dimension: 'TF', question: "爱情中最重要的是？", options: [{ text: "承诺与责任", value: 'T' }, { text: "理性与效率", value: 'T' }, { text: "理解与共鸣", value: 'F' }, { text: "温暖与默契", value: 'F' }] },
@@ -386,7 +499,7 @@
             { dimension: 'JP', question: "周末安排，你更喜欢？", options: [{ text: "提前计划好各项活动", value: 'J' }, { text: "有几项预定安排", value: 'J' }, { text: "根据心情临时决定", value: 'P' }, { text: "完全随性，不做计划", value: 'P' }] },
             { dimension: 'JP', question: "你的理想生活方式是？", options: [{ text: "稳定有序，目标明确", value: 'J' }, { text: "规律充实，计划周详", value: 'J' }, { text: "灵活多变，保持开放", value: 'P' }, { text: "自由探索，拥抱未知", value: 'P' }] },
             
-            // 爱情主题题 (JP维度) - 适度浪漫
+            // 爱情主题题 (JP维度)
             { dimension: 'JP', question: "对爱情的长远规划，你倾向于？", options: [{ text: "清晰规划每一步", value: 'J' }, { text: "有计划地推进", value: 'J' }, { text: "随心而动，顺其自然", value: 'P' }, { text: "享受当下的美好", value: 'P' }] },
             { dimension: 'JP', question: "恋爱中的约会安排，你更喜欢？", options: [{ text: "精心策划每个细节", value: 'J' }, { text: "有大致计划", value: 'J' }, { text: "自由发挥，即兴决定", value: 'P' }, { text: "随缘，走到哪算哪", value: 'P' }] },
             { dimension: 'JP', question: "面对恋人的临时提议，你会？", options: [{ text: "需要时间调整安排", value: 'J' }, { text: "确认计划后接受", value: 'J' }, { text: "欣然接受，觉得有趣", value: 'P' }, { text: "开心跟随，享受惊喜", value: 'P' }] },
@@ -463,8 +576,9 @@
             { dimension: 'TF', question: "他人评价对你影响？", options: [{ text: "理性看待，参考分析", value: 'T' }, { text: "客观判断，取舍参考", value: 'T' }, { text: "在意感受，影响情绪", value: 'F' }, { text: "重视态度，容易受伤", value: 'F' }] },
             { dimension: 'JP', question: "人生规划，你更倾向？", options: [{ text: "明确目标路径", value: 'J' }, { text: "有清晰路线图", value: 'J' }, { text: "保持开放可能", value: 'P' }, { text: "边走边看调整", value: 'P' }] }
         ];
+        // =================================================
 
-        // 植物人格描述（适度优化，爱情部分适当浪漫，其他保持简洁）
+        // ==================== 完整植物人格数据（16种） ====================
         const plantPersonalities = {
             'INTJ': {
                 name: '百岁兰',
@@ -595,47 +709,197 @@
                 scientificBasis: 'ESFP（表演者型）占人口7.5%。你的奖赏系统与情感处理区域基线活动水平较高，使你对积极社交体验极为敏感。神经科学研究表明，你在爱情中既是快乐源泉，也是社交磁石，以感染力创造充满欢笑的关系。'
             }
         };
+        // =================================================
 
         // 测试状态
         let currentQuestion = 0;
         let answers = {};
-        let selectedOption = null;
         let selectedQuestions = [];
 
-        // 从题库中随机抽取N题（可扩展至200题）
-        // 算法优化：使用Fisher-Yates洗牌算法变种，时间复杂度O(n)
-        function getRandomQuestions(count = QUESTIONS_PER_TEST) {
-            const questionsCopy = [...allQuestions];
-            const randomSelected = [];
-            
-            // 如果请求数量超过题库总量，返回全部题目
-            if (count >= questionsCopy.length) {
-                return questionsCopy.sort(() => Math.random() - 0.5);
-            }
-            
-            // 抽取N道题
-            for (let i = 0; i < count; i++) {
-                const randomIndex = Math.floor(Math.random() * questionsCopy.length);
-                randomSelected.push(questionsCopy.splice(randomIndex, 1)[0]);
-            }
-            
-            return randomSelected;
+        // ==================== 监控埋点 ====================
+        function trackEvent(eventName, params = {}) {
+            console.log(`[Track] ${eventName}`, params);
+            // 实际接入：window.gtag?.('event', eventName, params);
+        }
+        // =================================================
+
+        // ==================== 本地存储 ====================
+        // 保存进度
+        function saveProgress() {
+            const progressData = {
+                timestamp: Date.now(),
+                currentQuestion,
+                answers,
+                selectedQuestions,
+                questionCount: selectedQuestions.length
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(progressData));
+            console.log('[Storage] 进度已保存');
         }
 
+        // 检查是否有可恢复进度
+        function checkRestoreProgress() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) return false;
+
+            try {
+                const data = JSON.parse(saved);
+                const age = Date.now() - data.timestamp;
+                const maxAge = 24 * 60 * 60 * 1000; // 24小时有效期
+
+                if (age > maxAge) {
+                    localStorage.removeItem(STORAGE_KEY);
+                    return false;
+                }
+
+                // 显示恢复提示
+                const notice = document.getElementById('restoreNotice');
+                const timeStr = new Date(data.timestamp).toLocaleString('zh-CN');
+                document.getElementById('lastTestTime').textContent = timeStr;
+                notice.style.display = 'block';
+
+                trackEvent('restore_available', { age: Math.floor(age / 60000) + '分钟' });
+                return true;
+            } catch (e) {
+                console.error('[Storage] 解析失败:', e);
+                localStorage.removeItem(STORAGE_KEY);
+                return false;
+            }
+        }
+
+        // 恢复进度
+        function restoreProgress() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) return;
+
+            try {
+                const data = JSON.parse(saved);
+                currentQuestion = data.currentQuestion;
+                answers = data.answers;
+                selectedQuestions = data.selectedQuestions;
+
+                document.getElementById('welcomeScreen').style.display = 'none';
+                document.getElementById('testScreen').style.display = 'block';
+                showQuestion();
+
+                trackEvent('progress_restored', { questionCount: selectedQuestions.length });
+                showToast('进度恢复成功！继续答题吧');
+            } catch (e) {
+                console.error('[Storage] 恢复失败:', e);
+                localStorage.removeItem(STORAGE_KEY);
+            }
+        }
+
+        // 清除进度
+        function clearProgress() {
+            localStorage.removeItem(STORAGE_KEY);
+            console.log('[Storage] 进度已清除');
+        }
+        // =================================================
+
+        // ==================== 随机抽题算法 ====================
+        // Fisher-Yates洗牌算法（确保不重复）
+        function shuffleArray(array) {
+            const arr = [...array]; // 创建副本
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        // 抽取题目（绝对不重复）
+        function getRandomQuestions(count = QUESTIONS_PER_TEST) {
+            if (count > allQuestions.length) {
+                console.warn('[Questions] 请求数量超过题库，返回全部题目');
+                return shuffleArray(allQuestions);
+            }
+
+            const shuffled = shuffleArray(allQuestions);
+            const selected = shuffled.slice(0, count);
+            
+            // 验证唯一性
+            const usedQuestions = new Set();
+            selected.forEach((q, i) => {
+                const key = `${q.dimension}-${q.question.substring(0, 20)}`;
+                if (usedQuestions.has(key)) {
+                    console.error('[Questions] 警告：检测到可能的重复题目', key);
+                }
+                usedQuestions.add(key);
+            });
+            
+            return selected;
+        }
+        // =================================================
+
+        // ==================== UI交互 ====================
+        // 显示提示消息
+        function showToast(message, duration = 3000) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, duration);
+        }
+
+        // 更新按钮加载状态
+        function setButtonLoading(buttonId, isLoading) {
+            const btn = document.getElementById(buttonId);
+            const text = document.getElementById(buttonId + 'Text');
+            
+            if (isLoading) {
+                btn.disabled = true;
+                text.innerHTML = '题目生成中<span class="loading-spinner"></span>';
+            } else {
+                btn.disabled = false;
+                text.textContent = '开始测试';
+            }
+        }
+        // =================================================
+
         // 开始测试
-        function startTest() {
-            // 随机选择题目（支持50题或未来200题）
+        async function startTest() {
+            trackEvent('test_start', { questionCount: QUESTIONS_PER_TEST });
+            
+            setButtonLoading('startBtn', true);
+            
+            // 模拟异步加载（提升体验）
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
             selectedQuestions = getRandomQuestions(QUESTIONS_PER_TEST);
+            
+            // 验证题目唯一性
+            const ids = selectedQuestions.map((q, i) => `${q.dimension}-${i}`);
+            const unique = new Set(ids);
+            if (unique.size !== selectedQuestions.length) {
+                console.error('[Questions] 检测到重复题目！');
+                trackEvent('question_duplicate_error');
+            }
+            
+            currentQuestion = 0;
+            answers = {};
+            
+            setButtonLoading('startBtn', false);
             
             document.getElementById('welcomeScreen').style.display = 'none';
             document.getElementById('testScreen').style.display = 'block';
             showQuestion();
+            
+            // 自动保存进度（每5秒）
+            setInterval(() => {
+                if (Object.keys(answers).length > 0) {
+                    saveProgress();
+                }
+            }, 5000);
         }
 
         // 显示问题
         function showQuestion() {
             const question = selectedQuestions[currentQuestion];
-            document.getElementById('questionTitle').textContent = `问题 ${currentQuestion + 1}/${selectedQuestions.length}: ${question.question}`;
+            document.getElementById('questionTitle').textContent = 
+                `问题 ${currentQuestion + 1}/${selectedQuestions.length}: ${question.question}`;
             
             const optionsContainer = document.getElementById('optionsContainer');
             optionsContainer.innerHTML = '';
@@ -669,9 +933,8 @@
             // 更新按钮状态
             document.getElementById('prevBtn').disabled = currentQuestion === 0;
             document.getElementById('nextBtn').disabled = true;
-            selectedOption = null;
             
-            // 如果已经回答过当前题目，显示之前的选择
+            // 恢复已选答案
             if (answers[currentQuestion] !== undefined) {
                 const savedAnswer = answers[currentQuestion];
                 const optionIndex = question.options.findIndex(opt => opt.value === savedAnswer);
@@ -683,7 +946,7 @@
 
         // 选择选项
         function selectOption(index, value) {
-            // 清除之前的选择
+            // 清除之前选择
             document.querySelectorAll('.option').forEach(opt => opt.classList.remove('selected'));
             document.querySelectorAll('input[type="radio"]').forEach(radio => radio.checked = false);
             
@@ -692,12 +955,14 @@
             selectedElement.classList.add('selected');
             selectedElement.querySelector('input[type="radio"]').checked = true;
             
-            // 按题目索引存储答案
+            // 存储答案（按题目索引）
             answers[currentQuestion] = value;
-            selectedOption = value;
             
-            // 启用下一题按钮
+            // 启用下一题
             document.getElementById('nextBtn').disabled = false;
+            
+            // 自动保存
+            saveProgress();
         }
 
         // 下一题
@@ -705,6 +970,7 @@
             if (currentQuestion < selectedQuestions.length - 1) {
                 currentQuestion++;
                 showQuestion();
+                trackEvent('question_next', { current: currentQuestion + 1, total: selectedQuestions.length });
             } else {
                 showResult();
             }
@@ -715,61 +981,98 @@
             if (currentQuestion > 0) {
                 currentQuestion--;
                 showQuestion();
+                trackEvent('question_prev', { current: currentQuestion + 1, total: selectedQuestions.length });
             }
         }
 
-        // 计算结果
+        // 计算MBTI结果（核心修复）
         function calculateResult() {
             const dimensionScores = { E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 };
             
-            // 从按题目索引存储的答案中提取维度信息
+            // 统计每个维度的答案
             Object.entries(answers).forEach(([questionIndex, answerValue]) => {
-                const dimension = selectedQuestions[questionIndex].dimension;
-                if (dimension === 'EI') {
-                    if (answerValue === 'E') dimensionScores.E++;
-                    else dimensionScores.I++;
-                } else if (dimension === 'SN') {
-                    if (answerValue === 'S') dimensionScores.S++;
-                    else dimensionScores.N++;
-                } else if (dimension === 'TF') {
-                    if (answerValue === 'T') dimensionScores.T++;
-                    else dimensionScores.F++;
-                } else if (dimension === 'JP') {
-                    if (answerValue === 'J') dimensionScores.J++;
-                    else dimensionScores.P++;
+                const question = selectedQuestions[parseInt(questionIndex)];
+                if (!question) {
+                    console.warn('[Result] 题目索引无效:', questionIndex);
+                    return;
+                }
+                
+                const { dimension } = question;
+                if (!['E', 'I', 'S', 'N', 'T', 'F', 'J', 'P'].includes(answerValue)) {
+                    console.warn('[Result] 无效的答案值:', answerValue);
+                    return;
+                }
+                
+                if (dimension === 'EI' && ['E', 'I'].includes(answerValue)) {
+                    dimensionScores[answerValue]++;
+                } else if (dimension === 'SN' && ['S', 'N'].includes(answerValue)) {
+                    dimensionScores[answerValue]++;
+                } else if (dimension === 'TF' && ['T', 'F'].includes(answerValue)) {
+                    dimensionScores[answerValue]++;
+                } else if (dimension === 'JP' && ['J', 'P'].includes(answerValue)) {
+                    dimensionScores[answerValue]++;
                 }
             });
             
-            // 确定每个维度的倾向
+            // 计算完成度
+            const answeredCount = Object.keys(answers).length;
+            const completionRate = answeredCount / selectedQuestions.length;
+            
+            if (completionRate < 0.8) {
+                console.warn(`[Result] 完成度不足: ${(completionRate * 100).toFixed(1)}%`);
+                showToast('提示：还有未完成的题目，结果可能不够准确', 5000);
+            }
+            
+            // 确定每个维度
             const result = {
-                EI: dimensionScores.E > dimensionScores.I ? 'E' : 'I',
-                SN: dimensionScores.S > dimensionScores.N ? 'S' : 'N',
-                TF: dimensionScores.T > dimensionScores.F ? 'T' : 'F',
-                JP: dimensionScores.J > dimensionScores.P ? 'J' : 'P'
+                EI: dimensionScores.E >= dimensionScores.I ? 'E' : 'I',
+                SN: dimensionScores.S >= dimensionScores.N ? 'S' : 'N',
+                TF: dimensionScores.T >= dimensionScores.F ? 'T' : 'F',
+                JP: dimensionScores.J >= dimensionScores.P ? 'J' : 'P'
             };
             
-            // 处理平局情况
+            // 处理平局（按MBTI理论倾向）
             if (dimensionScores.E === dimensionScores.I) result.EI = 'I';
             if (dimensionScores.S === dimensionScores.N) result.SN = 'N';
             if (dimensionScores.T === dimensionScores.F) result.TF = 'F';
             if (dimensionScores.J === dimensionScores.P) result.JP = 'P';
             
-            return result.EI + result.SN + result.TF + result.JP;
+            // 生成最终类型
+            const finalType = result.EI + result.SN + result.TF + result.JP;
+            
+            // 校验类型是否存在
+            if (!plantPersonalities[finalType]) {
+                console.error('[Result] 计算出的类型不存在:', finalType);
+                trackEvent('result_type_error', { type: finalType });
+                return 'ESFJ'; // 兜底类型
+            }
+            
+            trackEvent('result_calculated', { 
+                type: finalType, 
+                completionRate: completionRate,
+                scores: dimensionScores 
+            });
+            
+            return finalType;
         }
 
         // 显示结果
         function showResult() {
+            trackEvent('test_complete', { totalQuestions: selectedQuestions.length });
+            
             const personalityType = calculateResult();
             const plantData = plantPersonalities[personalityType];
             
             if (!plantData) {
-                console.error('未找到对应的人格类型:', personalityType);
+                console.error('[Result] 植物数据缺失:', personalityType);
+                showToast('结果计算出错，请重新测试', 5000);
                 return;
             }
             
             document.getElementById('testScreen').style.display = 'none';
             document.getElementById('resultScreen').style.display = 'block';
             
+            // 填充结果数据
             document.getElementById('plantIcon').textContent = plantData.icon;
             document.getElementById('plantName').textContent = plantData.name;
             document.getElementById('plantLatin').textContent = plantData.latin;
@@ -787,6 +1090,12 @@
             });
             
             document.getElementById('scientificBasis').textContent = plantData.scientificBasis;
+            
+            // 清除本地进度
+            clearProgress();
+            
+            // 滚动到顶部
+            window.scrollTo(0, 0);
         }
 
         // 获取MBTI类型描述
@@ -802,25 +1111,83 @@
 
         // 重新测试
         function restartTest() {
+            trackEvent('test_restart');
+            
             currentQuestion = 0;
             answers = {};
-            selectedOption = null;
             selectedQuestions = [];
+            clearProgress();
             
             document.getElementById('resultScreen').style.display = 'none';
             document.getElementById('welcomeScreen').style.display = 'block';
+            
+            window.scrollTo(0, 0);
         }
 
-        // 键盘支持
+        // 分享结果
+        function shareResult() {
+            const type = calculateResult();
+            const plant = plantPersonalities[type];
+            
+            if (!plant) {
+                showToast('分享失败，请重试');
+                return;
+            }
+            
+            const shareText = `我的内在植物是${plant.name}（${type}）！🌱 ${plant.traits.slice(0, 3).join('、')}。快来测测你是哪种植物吧～`;
+            
+            if (navigator.share) {
+                navigator.share({
+                    title: '我的植物人格分析结果',
+                    text: shareText,
+                    url: window.location.href
+                }).then(() => {
+                    trackEvent('share_success', { method: 'native' });
+                }).catch(() => {
+                    fallbackShare(shareText);
+                });
+            } else {
+                fallbackShare(shareText);
+            }
+        }
+
+        // 备选分享方案
+        function fallbackShare(text) {
+            const shareContent = text + ' ' + window.location.href;
+            
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(shareContent).then(() => {
+                    showToast('结果已复制到剪贴板，快去分享吧！');
+                    trackEvent('share_success', { method: 'clipboard' });
+                }).catch(() => {
+                    // 降级方案
+                    const textarea = document.createElement('textarea');
+                    textarea.value = shareContent;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    showToast('结果已复制到剪贴板，快去分享吧！');
+                });
+            } else {
+                showToast('您的浏览器不支持分享功能');
+            }
+        }
+
+        // ==================== 键盘快捷键 ====================
+        let keyThrottleTimer;
         document.addEventListener('keydown', (e) => {
             if (document.getElementById('testScreen').style.display === 'none') return;
             
+            // 节流
+            if (keyThrottleTimer) return;
+            
             if (e.key === 'ArrowLeft' && !document.getElementById('prevBtn').disabled) {
                 previousQuestion();
-            } else if (e.key === 'ArrowRight' || e.key === 'Enter') {
-                if (!document.getElementById('nextBtn').disabled) {
-                    nextQuestion();
-                }
+                keyThrottleTimer = setTimeout(() => keyThrottleTimer = null, 200);
+            } else if ((e.key === 'ArrowRight' || e.key === 'Enter') && !document.getElementById('nextBtn').disabled) {
+                nextQuestion();
+                keyThrottleTimer = setTimeout(() => keyThrottleTimer = null, 200);
             } else if (e.key >= '1' && e.key <= '4') {
                 const optionIndex = parseInt(e.key) - 1;
                 const options = document.querySelectorAll('.option');
@@ -829,6 +1196,33 @@
                 }
             }
         });
+        // =================================================
+
+        // ==================== 页面加载 ====================
+        window.addEventListener('load', () => {
+            // 检查可恢复进度
+            checkRestoreProgress();
+            
+            // 页面可见性变化时保存进度
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'hidden' && Object.keys(answers).length > 0) {
+                    saveProgress();
+                }
+            });
+            
+            // 离开页面保护
+            window.addEventListener('beforeunload', (e) => {
+                const answeredCount = Object.keys(answers).length;
+                const totalCount = selectedQuestions.length;
+                
+                if (totalCount > 0 && answeredCount > 0 && answeredCount < totalCount) {
+                    const progress = Math.floor(answeredCount / totalCount * 100);
+                    e.preventDefault();
+                    e.returnValue = `测试进度将丢失，确定要离开吗？（已完成 ${progress}%）`;
+                }
+            });
+        });
+        // =================================================
     </script>
 </body>
 </html>
